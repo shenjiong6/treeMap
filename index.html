@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<title>Family Tree</title>
+<!--<script src="http://code.jquery.com/jquery-1.4.3.js"></script>
+<script src="https://d3js.org/d3.v4.js" charset="utf-8"></script> -->
+<script src="jquery/jquery-2.1.1.min.js" charset="utf-8"></script>
+<script src="d3/d3.min.js" charset="utf-8"></script>
+
+<!-- ScriptX 読み込み -->
+<object id=factory style="display:none"
+ classid="clsid:1663ed61-23eb-11d2-b92f-008048fdd814"
+ codebase="smsx/smsx.cab#Version=7,0,0,8" viewastext>
+</object>
+<!-- ScriptX 読み込み -->
+<script type="text/javascript">
+function SetPrintSettings() {
+	// -- basic features
+        factory.printing.header = "家系図ヘッダ名";
+        factory.printing.footer = "家系図フッタ名";
+        factory.printing.portrait = false; // 用紙方向 true: 縦 false: 横
+        factory.printing.leftMargin = 4;
+        factory.printing.topMargin = 4;
+        factory.printing.rightMargin = 4;
+        factory.printing.bottomMargin = 4;
+		
+		// -- advanced features
+ //factory.printing.SetMarginMeasure(2); // measure margins in inches
+ //factory.printing.printer = "HP DeskJet 870C";
+ //factory.printing.paperSize = "A3";
+ //factory.printing.paperSource = "Manual feed";
+ //factory.printing.collate = true;
+ //factory.printing.copies = 2;
+ //factory.printing.SetPageRange(false, 1, 3); // need pages from 1 to 3
+}
+
+function Print() {
+        factory.printing.Print(true); // 印刷実行  ture: 印刷ダイアログなし false: 印刷ダイアログあり
+}
+
+function Preview() {
+	factory.printing.Preview(); //浏览
+}
+</script>
+
+
+<script type="text/javascript">
+var layer_node_relation_def =[ 	["祖父", "祖母", "外祖父", "外祖母", "義祖父", "義祖母", "義外祖父", "義外祖母"],
+						["伯叔父母", "父", "母", "義伯叔父母", "義父", "義母" ],
+						["兄弟姉妹", "その配偶者", "本人", "配偶者", "義兄弟姉妹", "その配偶者" ],
+						["甥姪", "子", "子の配偶者", "義理の甥姪" ],
+						["孫", "孫の配偶者"] ];
+
+
+var layer_node_sub_relation_def =[ 	["祖父", "祖母", "外祖父", "外祖母", "義祖父", "義祖母", "義外祖父", "義外祖母"],
+						["伯父", "叔父", "伯母", "叔母",  "父", "母", "伯父", "叔父", "伯母", "叔母", "義伯父", "義叔父", "義伯母", "義叔母", "義父", "義母", "義伯父", "義叔父", "義伯母", "義叔母"],
+						["長兄", "長兄の妻", "次兄", "次兄の妻", "三兄", "三兄の妻", "長姉", "長姉の夫", "次姉", "次姉の夫", "三姉", "三姉の夫", "長弟", "長弟の妻", "次弟", "次弟の妻", "三弟", "三弟の妻", "長妹", "長妹の夫", "次妹", "次妹の夫", "三妹", "三妹の夫", "本人", "配偶者", "義長兄", "義長兄の妻", "義次兄", "義次兄の妻", "義三兄", "義三兄の妻", "義長姉", "義長姉の夫", "義次姉", "義次姉の夫", "義三姉", "義三姉の夫", "義長弟", "義長弟の妻", "義次弟", "義次弟の妻", "義三弟", "義三弟の妻", "義長妹", "義長妹の夫", "義次妹", "義次妹の夫", "義三妹", "義三妹の夫"],
+						["長兄の子", "長兄の女", "次兄の子", "次兄の女", "三兄の子", "三兄の女", "長姉の子", "長姉の女", "次姉の子", "次姉の女", "三姉の子", "三姉の女", "長弟の子", "長弟の女","次弟の子", "次弟の女", "三弟の子","三弟の女", "長妹の子", "長妹の女","次妹の子",  "次妹の女", "三妹の子", "三妹の女", "長男", "長男の妻", "二男", "二男の妻", "三男", "三男の妻","長女", "長女の夫", "二女", "二女の夫", "三女", "三女の夫" ],
+						["長男の子", "長男の女", "二男の子", "二男の女","三男の子","三男の女", "長女の子", "長女の女","二女の子", "二女の女","三女の子", "三女の女"]];
+var canvas_width = 1200;
+var canvas_height = 900;
+
+var title_height = 36;
+var title_width = 216;
+var title_padding_height = 10;
+
+var node_width = 72;
+var node_height = 126;
+// 層の最大のnode数
+var layer_max_nodenum = 12;
+var text_size = '10px Arial';
+var text_aglin = 'center';
+var rectangle_strokeStyle ='#F5270B';
+var rectangle_fillStyle = '#BBFFFF';
+
+var canvas = new Object();
+var context = new Object();
+
+
+var resetAllStructs = function() {
+	PersonRelations.PersonObjects.length = 0;
+	PersonRelations.MaritalRelObjects.length = 0;
+	PersonRelations.SortedMaritalRelObjects.length = 0;
+	PersonRelations.ParentChildRelObjects.length = 0;
+	
+	CalPositions.layer_node_sub_relation_set.length = 0;
+	CalPositions.layer_node_relation_set.length = 0;
+	CalPositions.layerInfo.length = 0;
+	CalPositions.layerNodeGcifNoInfo.length = 0;
+	CalPositions.layerMaritalNoArray.length=0;
+	CalPositions.nodePosInfo.length = 0;
+	CalPositions.layerHusbandNodes_temp=[[],[],[],[],[],[],[]];
+	CalPositions.allLayerNodes=[[],[],[],[],[],[],[]];
+};
+
+//--------------------------------------------------------------------
+/* クラス
+  PersonObjects:
+	[ {"gcif_no": 100000001, "name": "山田隆", … "main_flg": false}， 
+	  {...}，
+	   ...
+	  {"gcif_no": 100000030, "name": "鈴木まさ", … "main_flg": false} ]
+  PersonsMap:   key: gcif_no
+
+  MaritalRelObjects:
+	[ {relation_no: "r000000001";  husband_gcif_no: 100000001;  wife_gcif_no: 100000004 }
+	... ]
+  MaritalRelMap:   key: relation_no
+  MaritalHusbandKeyMap:   key: husband_gcif_no
+  MaritalWifeKeyMap:   key: wife_gcif_no
+  
+
+  ParentChildRelObjects	
+	[ {relation_no: "r000000001";  marital_relation_no: 100000005;  child_gcif_no: 100000009 }
+	... ]
+  ParentChildRelMap:   key: relation_no
+  ParentChildMap:   key: child_gcif_no
+*/
+//--------------------------------------------------------------------
+var PersonRelations = {
+	// Personのインスタンスを格納
+	PersonObjects : [],
+	PersonsMap : null,
+	MaritalRelObjects : [],
+	SortedMaritalRelObjects : [],
+	MaritalRelMap : null,
+	MaritalHusbandKeyMap : null,
+	MaritalWifeKeyMap : null,
+	ParentChildRelObjects : [],
+	ParentChildRelMap : null,
+	ParentChildMap : null,
+
+	parseJsonToObjects : function(jsonData) {
+		//PersonRelations.PersonObjects.length = 0;
+		$.each(jsonData.person, function(infoIndex,info){
+					console.log(info["gcif_no"]+ "/" +info["name"]+"/" +info["relation"] +"/" +info["sex"]+ "/" +info["birthdate"]+ "/" 
+						+info["assets"]+ "/" +info["main_flg"]);
+					var personObject = new Object();
+					personObject.gcif_no = info["gcif_no"];
+					personObject.name = info["name"];
+					personObject.relationName = info["relation"];
+					personObject.sub_relationName = info["sub_relation"];
+					personObject.sex = info["sex"];
+					personObject.birthdate_text = info["birthdate_text"];
+					personObject.age = info["age"];
+					personObject.birthdate = info["birthdate"];
+					personObject.death_status = info["death_status"];
+					personObject.job = info["job"];
+					personObject.assets = info["assets"];
+					personObject.main_flg = info["main_flg"];
+					PersonRelations.PersonObjects.push(personObject);
+				
+		});
+		//PersonRelations.MaritalRelObjects.length = 0;
+		$.each(jsonData.marital_relation,function(infoIndex,info){
+					console.log(info["relation_no"]+ "/" +info["husband_gcif_no"]+ "/" +info["wife_gcif_no"]);
+					var maritalRelObject = new Object();
+					maritalRelObject.relation_no = info["relation_no"];
+					maritalRelObject.husband_gcif_no = info["husband_gcif_no"];
+					maritalRelObject.wife_gcif_no = info["wife_gcif_no"];
+					PersonRelations.MaritalRelObjects.push(maritalRelObject);
+		});
+		//PersonRelations.ParentChildRelObjects.length = 0;
+		$.each(jsonData.parent_child_relation,function(infoIndex,info){
+					console.log(info["relation_no"] + "/" + info["marital_relation_no"] + "/" + info["child_gcif_no"]);
+					var parentChildRelObject = new Object();
+					parentChildRelObject.relation_no = info["relation_no"];
+					parentChildRelObject.marital_relation_no = info["marital_relation_no"];
+					parentChildRelObject.child_gcif_no = info["child_gcif_no"];
+					PersonRelations.ParentChildRelObjects.push(parentChildRelObject);
+		});
+
+	},
+	
+	toMap : function() {
+		console.log("toMap: PersonObjects.size:"+PersonRelations.PersonObjects.length 
+				+"  MaritalRelObjects.size:"+PersonRelations.MaritalRelObjects.length 
+				+"  ParentChildRelObjects.size:"+PersonRelations.ParentChildRelObjects.length);
+		this.PersonsMap  = d3.map(PersonRelations.PersonObjects, function(d) {
+			return d.gcif_no;
+		});
+
+		this.MaritalRelMap = d3.map(PersonRelations.MaritalRelObjects, function(d) {
+			return d.relation_no;
+		});
+		this.MaritalHusbandKeyMap = d3.map(PersonRelations.MaritalRelObjects, function(d) {
+			return d.husband_gcif_no;
+		});
+		this.MaritalWifeKeyMap = d3.map(PersonRelations.MaritalRelObjects, function(d) {
+			return d.wife_gcif_no;
+		});
+
+		this.ParentChildRelMap = d3.map(PersonRelations.ParentChildRelObjects, function(d) {
+			return d.relation_no;
+		});
+		this.ParentChildMap = d3.map(PersonRelations.ParentChildRelObjects, function(d) {
+			return d.child_gcif_no;
+		});
+
+	}
+
+};
+
+
+var CalPositions = {
+	rootLayerNo : 0,
+	// root nodeのhusband node [husband1, husband2]
+	rootLayerHusband:[],
+	
+	// [[husband_gcif_no1, husband_gcif_no2, ...], [], [], ... []]
+	// 最大７行
+	layerHusbandNodes_temp:[[],[],[],[],[],[],[]],
+	layerMaritalNoArray: [],
+	// [[gcif_no1, gcif_no2, ...], [], [], ... []]
+	allLayerNodes:[[],[],[],[],[],[],[]],
+	//  [{rel_no, husband_gcif_no1, wife_gcif_no2}, ...{} ]
+	layerNodesArr: [],
+	// [ ["曾祖父", "曾祖母", "配偶者の曾祖父", "配偶者の曾祖母"], [...], ...]
+	layer_node_relation_set: [],
+	// [ ["長女", "長女の夫", "二女", "二女の夫"...], [...], ...]
+	layer_node_sub_relation_set: [],
+	
+	// [{layerNo: 2}, ... {}]
+	layerInfo : [],
+	
+	layerNodeGcifNoInfo : [],
+	// 層の数
+	layerNum : 0,
+	
+	row_height: 0,
+	padding_height: 0,
+	rectanglePosInfo: {},
+	
+	mediumNodeArray: [],
+	
+	nodePosInfo: [],
+
+	initLayer : function() {
+		//CalPositions.layer_node_sub_relation_set.length = 0;
+		// set になれば、has操作できる
+		for (var i = 0; i <layer_node_sub_relation_def.length; i++) {
+			node_set = d3.set(layer_node_sub_relation_def[i]);
+			CalPositions.layer_node_sub_relation_set.push(node_set);
+		}
+		console.log("-----------CalPositions.layer_node_sub_relation_set-----------");
+		console.log(CalPositions.layer_node_sub_relation_set);
+		
+		//CalPositions.layer_node_relation_set.length = 0;
+		// set になれば、has操作できる
+		for (var i = 0; i <layer_node_relation_def.length; i++) {
+			node_set = d3.set(layer_node_relation_def[i]);
+			CalPositions.layer_node_relation_set.push(node_set);
+		}
+		console.log("-----------CalPositions.layer_node_relation_set-----------");
+		console.log(CalPositions.layer_node_relation_set);
+	},
+
+	// Nodeを各layerにinsertする
+	distributeNodesIntoLayer : function() {
+		//--------------------------------------------------------------------------------------------------------------------
+		console.log("===========================各husband nodeを各layerにinsert==================================");
+		// 毎「夫婦」関係を取得　→　husband nodeだけlayer にinsert する（妻は後でもいい）、
+		// でも最後行はwifeがない可能性ある、孫の場合、CalPositions.layerHusbandNodes_temp.length = 層数　-1		
+		
+		
+		for (var i = 0; i<PersonRelations.MaritalRelObjects.length; i++) {
+			relation_no = PersonRelations.MaritalRelObjects[i].relation_no;
+			console.log("in for loop "+i+" relation_no:"+relation_no);
+			// 父子関係の左node
+			husband_gcif_no = PersonRelations.MaritalRelMap.get(relation_no).husband_gcif_no;
+			console.log("  husband_gcif_no:"+husband_gcif_no);
+			// "祖父/祖母"など
+			relationName = PersonRelations.PersonsMap.get(husband_gcif_no).relationName;
+			console.log("  relationName :"+relationName);
+			// 何目のlayerに存在するかを判断する
+			for (var j=0; j < CalPositions.layer_node_relation_set.length ;j++) {
+				if (CalPositions.layer_node_relation_set[j].has(relationName)) {
+					// [[husband_gcif_no1, husband_gcif_no2, ...], [], [], ... []]
+					// ★同じparentの場合、１回だけ追加
+					if (CalPositions.layerHusbandNodes_temp[j].indexOf(husband_gcif_no) < 0) {
+						CalPositions.layerHusbandNodes_temp[j].push(husband_gcif_no);
+						console.log("CalPositions.layerHusbandNodes_temp[j]:");
+						console.log(CalPositions.layerHusbandNodes_temp[j]);
+					}
+				}
+			}
+		}
+		console.log("--------------------------------------CalPositions.layerHusbandNodes_temp------------------------------");
+		/* 各層 の husband node
+		   [["100000011", "100000017"], ..., 
+		    ["100000005", "100000025", "100000027"], 
+		    [...],
+		    [],
+		    [] ]    空の層がある
+		*/
+		console.log(CalPositions.layerHusbandNodes_temp);
+		
+		// 各nodeを各layerにinsert、順序がない
+		console.log("===========================各nodeを各layerにinsert==================================");
+		for (var i = 0; i < PersonRelations.PersonObjects.length; i++) {
+			gcif_no = PersonRelations.PersonObjects[i].gcif_no;
+			console.log("in for loop gcif_no:"+gcif_no);
+			// "祖父/祖母"など
+			relationName = PersonRelations.PersonObjects[i].relationName;
+			console.log("  relationName :"+relationName);
+			// 何目のlayerに存在するかを判断する
+			for (var j=0; j < CalPositions.layer_node_relation_set.length ;j++) {
+				if (CalPositions.layer_node_relation_set[j].has(relationName)) {
+					console.log("----------------j:"+j+"----------------");
+					// [[gcif_no1, gcif_no2, ...], [], [], ... []]
+					CalPositions.allLayerNodes[j].push(gcif_no);
+					console.log("CalPositions.allLayerNodes[j]:");
+					console.log(CalPositions.allLayerNodes[j]);
+
+				}
+			}
+		}
+		console.log("------------------------------------------CalPositions.allLayerNodes----------------------------------");
+		/* 各層のすべての node　順序なし
+		   [["100000011", "100000012", "100000017", "100000018"], 
+		    ["100000005", "100000025", "100000027"], 
+			..., 
+		    [],
+			[] ] */
+		console.log(CalPositions.allLayerNodes);
+		//-------------------------------------------------------------------------------------------------------------------------
+		// root layer の夫婦　を取得
+		rootSetted = false;
+		this.layerNum = 0;
+		this.rootLayerHusband.length = 0;
+		for (var k = 0; k < CalPositions.allLayerNodes.length; k++){
+			// nodes有る
+			if (CalPositions.allLayerNodes[k].length !=0) {
+				// 層の数を計算
+				this.layerNum = this.layerNum + 1;
+				if (!rootSetted) {
+					// root layer 順序を調整した後 exit (root layerだけ調整必要、後はroot layerより探す)
+					rootLayerNo = k;
+					// [husband1, husband2, ......]
+					for (m = 0; m < CalPositions.layerHusbandNodes_temp[k].length; m++) {
+						this.rootLayerHusband.push(CalPositions.layerHusbandNodes_temp[k][m]);
+						
+						console.log("◆◆◆◆◆◆root rootLayerHusband:");
+						console.log(this.rootLayerHusband);
+					}
+					rootSetted = true;
+				}
+			}
+
+		}
+		// root rootLayerHusband:100000001,100000003,100000005,100000007
+		console.log("root rootLayerHusband:"+this.rootLayerHusband);
+		console.log("rootLayer番号:"+this.rootLayerNo);
+		console.log("層の数:"+this.layerNum);
+		
+		//------------------------------------------------------------------------------------------------------------------------
+		// root 層に対して、 Husband　node の順序を再配置・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・
+		var rootLayerHusbandSorted = CalPositions.sortLayerNodes(layer_node_relation_def[0], this.rootLayerHusband);
+		
+		console.log("■■■■■■■■■■■root rootLayerHusbandSorted:");
+		console.log(rootLayerHusbandSorted);
+		//・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・
+		// this.rootLayerHusband 
+		// 　↓　↓　↓
+		// root 層夫婦nodeを探す
+		var rootMediumNodeArray=[];
+		var layerNodes = new Array();
+		var layerNodesGcifnoArr = new Array();
+		for (var i =0; i<rootLayerHusbandSorted.length; i++) {
+			// husband_no　→　relation_no　取得(中間node)
+			var layerObj = new Object();
+			layerObj.relation_no = CalPositions.findRelNodeFromHusband(rootLayerHusbandSorted[i]);
+			rootMediumNodeArray.push(layerObj.relation_no);
+
+			// node はhusband もwife　も可能性あるので、直接　person：spouseで定義
+			layerObj.person_gcif_no = rootLayerHusbandSorted[i];
+			// 配偶者を探す
+			layerObj.spouse_gcif_no = CalPositions.findWifeNodeFromHusband(rootLayerHusbandSorted[i]);
+			console.log("layerObj:");
+			console.log(layerObj);
+			// [ {relation_no: "r000000001",person_gcif_no: "100000001",spouse_gcif_no: "100000002"}, ...{} ]
+
+			layerNodes.push(layerObj);
+			
+			layerNodesGcifnoArr.push(layerObj.person_gcif_no);
+			layerNodesGcifnoArr.push(layerObj.spouse_gcif_no);
+
+		}
+		/*[
+		   { husband_gcif_no"100000005",
+			 relation_no"r000000003",
+			 wife_gcif_no"100000006"
+			},
+		   { husband_gcif_no"100000009",
+ 			  relation_no"",
+ 			  wife_gcif_no"" 
+			}, 
+ 			  ...
+		   { husband_gcif_no"100000010",
+ 			 relation_no"",
+ 			 wife_gcif_no"" 
+			}, ...
+		  ]
+		*/
+
+		CalPositions.layerInfo.push(layerNodes);
+		console.log("1行目: layerInfo with only root:");
+		console.log(CalPositions.layerInfo);
+		console.log("1行目: layerNodeGcifNoInfo with only root:");
+		CalPositions.layerNodeGcifNoInfo.push(layerNodesGcifnoArr);
+
+		//["r000000001", "r000000002", "r000000003", "r000000004"]  root layer の夫婦関係
+		CalPositions.mediumNodeArray = rootMediumNodeArray;
+		console.log("first mediumNodeArray:");
+		console.log(CalPositions.mediumNodeArray);
+		
+		// 2層目から、parentよりchild, childの配偶を探す
+		for (var i =1; i<this.layerNum; i++) {
+			CalPositions.findChildNodes(CalPositions.mediumNodeArray);
+		}
+		console.log("===========layerInfo finally:");
+		console.log(CalPositions.layerInfo);
+		console.log("===========layerMaritalNoArray finally:");
+		console.log(CalPositions.layerMaritalNoArray);
+		
+		
+		
+		// 夫婦線を描くには、sorted　MaritalRelObject が必要です
+		for (var k =0; k <CalPositions.layerMaritalNoArray.length; k++) {
+			for (var m =0; m <CalPositions.layerMaritalNoArray[k].length; m++) {
+				
+				var maritalRelObject = new Object();
+				maritalRelObject.relation_no = CalPositions.layerMaritalNoArray[k][m];
+				maritalRelObject.husband_gcif_no = PersonRelations.MaritalRelMap.get(maritalRelObject.relation_no).husband_gcif_no;
+				maritalRelObject.wife_gcif_no = PersonRelations.MaritalRelMap.get(maritalRelObject.relation_no).wife_gcif_no;
+				console.log("===================== maritalRelObject=====================" );
+				console.log(maritalRelObject);
+				PersonRelations.SortedMaritalRelObjects.push(maritalRelObject);			
+			}
+		}
+		console.log("===================== PersonRelations.MaritalRelObjects finally:====================");
+		console.log(PersonRelations.MaritalRelObjects);
+		console.log("===================== PersonRelations.SortedMaritalRelObjects finally:====================");
+		console.log(PersonRelations.SortedMaritalRelObjects);
+		
+	},
+	
+	// 層づつ Husband　node の順序を再配置
+	sortLayerNodes : function(layer_node_relation_def_array, rootLayer) {
+		
+		var rootLayerHusbandSorted = new Array();
+		for (i=0; i<layer_node_relation_def_array.length; i++) {
+			
+			for (j=0; j<rootLayer.length; j++) {
+				if (layer_node_relation_def_array[i] == PersonRelations.PersonsMap.get(rootLayer[j]).relationName) {
+					rootLayerHusbandSorted.push(rootLayer[j]);
+				}
+			}
+			
+		}
+		console.log("root rootLayerHusbandSorted:");
+		console.log(rootLayerHusbandSorted);
+		return rootLayerHusbandSorted;
+	},
+
+	// parentからchild　を探す、同時に配偶も探す
+	//  [ "r000000001", "r000000004", ... ]
+	findChildNodes : function(mediumNodeArr) {
+		console.log("each loop in begining CalPositions.mediumNodeArray:");
+		console.log(CalPositions.mediumNodeArray);
+		console.log("each loop in begining mediumNodeArr:");
+		console.log(mediumNodeArr);
+		CalPositions.layerMaritalNoArray.push(mediumNodeArr);
+		
+		var rootMediumNodeArray= new Array();
+		layerNodes = new Array();
+		// [ "r000000001", "r000000004", ... ]
+		layerNodesGcifnoArr = new Array();
+		
+		// ↓↓↓　"本人" "父" "義父"の場合、node はskipして、右に移動、フラグとして表示、trueはある
+		var skipped = false;
+		var skipObj = new Object();
+		// ↑↑↑　"本人" "父" "義父"の場合、node はskipして、右に移動、フラグとして表示、trueはある
+		
+		for (var k =0; k < mediumNodeArr.length; k++) {
+			
+			// "本人" "父" "義父"の場合、node はskipしたから、右に移動、最後は追加
+			if (skipped) {
+				console.log("★★★★★★本人,父,義父の場合 skipped　skipObj：");
+				console.log(skipObj);
+				layerNodesGcifnoArr.push(skipObj.person_gcif_no);
+				layerNodesGcifnoArr.push(skipObj.spouse_gcif_no);
+				if (skipObj.relation_no != "" ) {
+					rootMediumNodeArray.push(skipObj.relation_no);
+				}
+				
+				pushObj = new Object();				
+				pushObj.relation_no = skipObj.relation_no;
+				pushObj.person_gcif_no = skipObj.person_gcif_no;
+				pushObj.spouse_gcif_no =skipObj.spouse_gcif_no
+				
+				layerNodes.push(pushObj);
+
+				skipped　=false;
+			}
+			
+			// 全て探す、marital_relation_no重複の場合(父：子　→　１：Ｎ)があるのでmapを利用できない、childを探す
+			for (var j = 0; j<PersonRelations.ParentChildRelObjects.length; j++) {
+				// parent を見つけました（"r000000001"）
+				if ( PersonRelations.ParentChildRelObjects[j].marital_relation_no == mediumNodeArr[k]) {
+					console.log("★mediumNodeArr[k]:"+mediumNodeArr[k]);
+					// parentからChildを探した
+					child_no = PersonRelations.ParentChildRelObjects[j].child_gcif_no;
+					// 夫婦の場合、重複追加を防ぐ
+					if (layerNodesGcifnoArr.indexOf(child_no) < 0) {
+						console.log("---------child_no:"+child_no);
+						var layerObj = new Object();
+						if (CalPositions.isHusband(child_no)) {
+							console.log("---------child is husband-----------");
+							if (PersonRelations.PersonsMap.get(child_no).relationName != "本人" 
+									&& PersonRelations.PersonsMap.get(child_no).relationName != "父"
+									&& PersonRelations.PersonsMap.get(child_no).relationName != "義父") {
+								console.log("本人, 父, 義父　以外");
+								layerObj.relation_no = CalPositions.findRelNodeFromHusband(child_no);
+								layerObj.person_gcif_no = child_no;
+								// 配偶者を探す
+								layerObj.spouse_gcif_no = CalPositions.findWifeNodeFromHusband(child_no);
+								
+								layerNodesGcifnoArr.push(layerObj.person_gcif_no);
+								layerNodesGcifnoArr.push(layerObj.spouse_gcif_no);
+							} else {
+								// "本人" "父" "義父"の場合、node はskipしたから、右に移動、最後は追加
+								skipped = true;
+								// temp 保存、最後に追加
+								skipObj.relation_no = CalPositions.findRelNodeFromHusband(child_no);
+								skipObj.person_gcif_no = child_no;
+								// 配偶者を探す
+								skipObj.spouse_gcif_no = CalPositions.findWifeNodeFromHusband(child_no);
+							}
+						} else if (CalPositions.isWife(child_no)) {
+							console.log("---------child is wife-----------");
+							layerObj.relation_no = CalPositions.findRelNodeFromWife(child_no);
+							// 配偶者を探す
+							layerObj.person_gcif_no = CalPositions.findHusbandNodeFromWife(child_no);
+							layerObj.spouse_gcif_no = child_no;
+							
+							layerNodesGcifnoArr.push(layerObj.person_gcif_no);
+							layerNodesGcifnoArr.push(layerObj.spouse_gcif_no);
+						} else {
+							console.log("---------child 配偶者がなし-----------");
+							layerObj.relation_no = "";
+							// 配偶者がなしの場合、husband_gcif_noとしてセットする
+							layerObj.person_gcif_no = child_no;
+							layerObj.spouse_gcif_no = "";
+							
+							layerNodesGcifnoArr.push(child_no);
+						}
+						console.log("★★layerObj.relation_no:"+layerObj.relation_no);
+						// "本人" "父" "義父"の場合、layerObj.relation_no =undefined
+						if (layerObj.relation_no != "" && layerObj.relation_no !=undefined ) {
+							console.log("---------layerObj.relation_no != 空 && layerObj.relation_no !=undefined -----------");
+							rootMediumNodeArray.push(layerObj.relation_no);
+						}
+						/*
+						[ {relation_no: "r000000001",　person_gcif_no: "100000001",　spouse_gcif_no: "100000002"}, 
+						　{relation_no: "",　　　　　　person_gcif_no: "100000003",　spouse_gcif_no: ""},  →単身
+						   ...
+						  {...} 
+						]
+						*/
+						// "本人" "父" "義父"以外の場合
+						if (!skipped) {
+							layerNodes.push(layerObj);
+							console.log("本人 父 義父 以外の場合 layerNodes:");
+							console.log(layerNodes);
+						}
+					}
+				}
+			}// for child
+			
+//・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・
+			//sortLayerNodes(, layerNodesGcifnoArr);
+//・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・
+			
+		} // for mediumNodeArr loop
+		CalPositions.mediumNodeArray = rootMediumNodeArray;
+		CalPositions.layerInfo.push(layerNodes);
+		CalPositions.layerNodeGcifNoInfo.push(layerNodesGcifnoArr);
+		console.log("---------------------------CalPositions.layerNodeGcifNoInfo:----------------------------");
+		console.log(CalPositions.layerNodeGcifNoInfo);
+		
+	},
+
+	/*
+	  CalPositions.layerNodeGcifNoInfoを利用して、各nodeのstart pointのpositionを計算、padding_width padding_height を計算	
+	  layerNodeGcifNoInfoの順序は正しい前提
+	*/
+	calEachNode_XY_Pos : function() {
+		X_Pos = 0;
+		Y_Pos = 0;
+		
+		
+		// 作成日 タイトル用 を除く
+		canvas_height = canvas_height - title_height - title_padding_height;
+		Y_Pos = title_height + title_padding_height;
+		
+		CalPositions.row_height = canvas_height/CalPositions.layerNum;
+		CalPositions.padding_height = (CalPositions.row_height - node_height)/2;
+		// { row_height: 300, 
+		//   padding_height: 20,  
+		//   padding_width_arr: [10, 20, ... 50]
+		//  }
+		CalPositions.rectanglePosInfo.row_height = CalPositions.row_height;
+		CalPositions.rectanglePosInfo.padding_height = CalPositions.padding_height;
+		
+		var padding_width_array = new Array();
+			
+		// ↓↓↓↓↓↓↓↓↓↓↓↓↓ node >12 の場合、最大数より、canvas width 再計算↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+		var rowNum_forMax = new Array();
+		for (var ln =0; ln < CalPositions.layerNodeGcifNoInfo.length; ln++) {
+			rowNumber = CalPositions.layerNodeGcifNoInfo[ln].length;
+			console.log("★rowNumber:"+rowNumber);
+			if (rowNumber > 12) {
+				rowNum_forMax.push(rowNumber);
+			}
+		}
+		console.log("★rowNum_forMax:"+rowNum_forMax);
+		console.log(rowNum_forMax);
+		rowNum_forMax.sort(d3.descending);
+		maxRowNum = rowNum_forMax[0];
+		console.log("★sorted rowNum_forMax:"+rowNum_forMax);
+		console.log(rowNum_forMax);
+		
+		//更新
+		if(rowNum_forMax.length !=0){
+			canvas_width = canvas_width + (maxRowNum - 12)*(canvas_width/12);
+		}
+		
+		
+		console.log("★★★★★★★★★★★★★canvas_width:  "+canvas_width);
+	
+		$("#canvas_area").attr("width", canvas_width);
+		// ↑↑↑↑↑↑↑↑↑↑↑↑↑ node >12 の場合、最大数より、canvas width 再計算↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+		
+		// 行づつ
+		for (var ln =0; ln < CalPositions.layerNodeGcifNoInfo.length; ln++) {
+			// nodeある
+			if (CalPositions.layerNodeGcifNoInfo[ln].length != 0) {
+
+				var rectangleArray = new Array();
+				
+				var layerNodeNum = CalPositions.layerNodeGcifNoInfo[ln].length;
+				var layerblock_width = canvas_width/layerNodeNum;
+				var padding_width = (layerblock_width - node_width)/2;
+				padding_width_array.push(padding_width);
+	
+				// 列づつ
+				var realColNum = 0;
+
+				for (var col =0; col<CalPositions.layerNodeGcifNoInfo[ln].length; col++) {
+					rectangleNode = new Object();
+	
+					rectangleNode.gcif_no = CalPositions.layerNodeGcifNoInfo[ln][col];
+					rectangleNode.rectangleX = X_Pos + col*layerblock_width + padding_width;
+					rectangleNode.rectangleY = Y_Pos + ln*CalPositions.row_height + CalPositions.padding_height;
+					rectangleNode.rectanglewidth = node_width;
+					rectangleNode.rectanglehight = node_height;
+					rectangleNode.strokeStyle ='#F5270B';
+	
+					rectangleArray.push(rectangleNode);
+					PaintClass.rectangle.push(rectangleNode);
+			
+				}
+				CalPositions.nodePosInfo.push(rectangleArray);	
+					
+			} else 
+				break;
+		}
+					
+		CalPositions.rectanglePosInfo.padding_width_array = padding_width_array;
+		console.log(" --------------nodePosInfo:");
+		console.log(CalPositions.nodePosInfo);
+		console.log(" --------------rectangle:");
+		console.log(PaintClass.rectangle);
+		console.log(" --------------CalPositions.rectanglePosInfo:");
+		console.log(CalPositions.rectanglePosInfo);
+	},
+	
+	
+	// add text
+	add_Text_Pos : function() {
+		var row_num = 7;
+		var text_hight = node_height/row_num;
+
+		for (var j =0; j<CalPositions.nodePosInfo.length; j++) {
+			for (var k =0; k<CalPositions.nodePosInfo[j].length; k++) {
+					          
+				for (var pj =0; pj<PersonRelations.PersonObjects.length; pj++) {
+                	if (PersonRelations.PersonObjects[pj].gcif_no==CalPositions.nodePosInfo[j][k].gcif_no) {
+   
+						text_Pos = new Object();
+						text_Pos.text_context = PersonRelations.PersonObjects[pj].relationName;
+						text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+						text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 	text_hight/2;
+						text_Pos.text_font = text_size;
+						text_Pos.text_textAlign = text_aglin;
+						PaintClass.texts.push(text_Pos);
+						
+						text_Pos = new Object();
+						text_Pos.text_context = PersonRelations.PersonObjects[pj].name ;
+						text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+						text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 2*text_hight;
+						text_Pos.text_font = text_size;
+						text_Pos.text_textAlign = text_aglin;
+						PaintClass.texts.push(text_Pos);
+						
+						text_Pos = new Object();
+						text_Pos.text_context = PersonRelations.PersonObjects[pj].sub_relationName ;
+						text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+						text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 3*text_hight+text_hight/2;
+						text_Pos.text_font = text_size;
+						text_Pos.text_textAlign = text_aglin;
+						PaintClass.texts.push(text_Pos);
+						
+						text_Pos = new Object();
+						text_Pos.text_context = PersonRelations.PersonObjects[pj].birthdate_text ;
+						text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+						text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 4*text_hight+text_hight/2;
+						text_Pos.text_font = text_size;
+						text_Pos.text_textAlign = text_aglin;
+						PaintClass.texts.push(text_Pos);
+						
+						text_Pos = new Object();
+						text_Pos.text_context = PersonRelations.PersonObjects[pj].age ;
+						text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+						text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 5*text_hight+text_hight/2;
+						text_Pos.text_font = text_size;
+						text_Pos.text_textAlign = text_aglin;
+						PaintClass.texts.push(text_Pos);
+						
+						if (PersonRelations.PersonObjects[pj].age == "") {
+							text_Pos = new Object();
+							text_Pos.text_context = PersonRelations.PersonObjects[pj].job ;
+							text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+							text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 6*text_hight+text_hight/2;
+							text_Pos.text_font = text_size;
+							text_Pos.text_textAlign = text_aglin;
+							PaintClass.texts.push(text_Pos);
+						} else {
+							text_Pos = new Object();
+							text_Pos.text_context = PersonRelations.PersonObjects[pj].death_status ;
+							text_Pos.text_posX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth/2;
+							text_Pos.text_posY = CalPositions.nodePosInfo[j][k].rectangleY + 6*text_hight+text_hight/2;
+							text_Pos.text_font = text_size;
+							text_Pos.text_textAlign = text_aglin;
+							PaintClass.texts.push(text_Pos);
+						}
+
+						var lines_Pos = new Object();
+						lines_Pos.moveToX = CalPositions.nodePosInfo[j][k].rectangleX ;
+						lines_Pos.moveToY = CalPositions.nodePosInfo[j][k].rectangleY + 	text_hight;
+						lines_Pos.lineToX = CalPositions.nodePosInfo[j][k].rectangleX + CalPositions.nodePosInfo[j][k].rectanglewidth;
+						lines_Pos.lineToY = CalPositions.nodePosInfo[j][k].rectangleY + 	text_hight;
+						PaintClass.lines.push(lines_Pos);
+						
+						rectangleNode = new Object();
+						
+						rectangleNode.rectangleX = CalPositions.nodePosInfo[j][k].rectangleX ;
+						rectangleNode.rectangleY = CalPositions.nodePosInfo[j][k].rectangleY ;
+						rectangleNode.rectanglewidth = node_width;
+						rectangleNode.rectanglehight = node_height;
+						rectangleNode.strokeStyle =rectangle_strokeStyle;
+						rectangleNode.fillStyle = rectangle_fillStyle;
+						
+						PaintClass.rectangle.push(rectangleNode);
+
+					}
+			    }               
+			}
+		}
+	},
+
+	
+	// couple lines
+	calLines_Couple_Pos : function() {
+		
+		// from Marital to  find  husband/wife line  and  child line
+		console.log("==========from Marital to  find  husband/wife line  and  child line==========");
+		for (var i = 0; i<PersonRelations.SortedMaritalRelObjects.length; i++) {
+			PersonRelations.SortedMaritalRelObjects[i].rightSonX  = 0;
+			relation_no = PersonRelations.SortedMaritalRelObjects[i].relation_no;
+			husband_gcif_no = PersonRelations.SortedMaritalRelObjects[i].husband_gcif_no;
+			wife_gcif_no = PersonRelations.SortedMaritalRelObjects[i].wife_gcif_no;
+			lines_Pos = new Object();
+            text_Pos = new Object();
+			hus_rectangleX  = new Object();
+			hus_rectangleY = new Object();
+			hus_rectanglewidth = new Object();
+			hus_rectanglehight = new Object();
+			wif_rectangleX = new Object();
+			wif_rectangleY = new Object();
+			wif_rectanglewidth = new Object();
+			wif_rectanglehight = new Object();
+            text_context = new Object();
+			text_posX = new Object();
+			text_posY = new Object();
+			text_font = new Object();
+			text_textAlign = new Object();
+			chil_rectangleX = new Object();
+			chil_rectangleY = new Object();
+			chil_rectanglewidth = new Object();
+			chil_rectanglehight = new Object();
+			level = new Object();
+			childLevel = new Object();
+			child_gcif_no = new Object();
+			console.log("----------wife and husband:"+i+"----------"+relation_no+"------"+husband_gcif_no+"-------"+wife_gcif_no);
+			for (var j =0; j<CalPositions.nodePosInfo.length; j++) {
+				for (var k =0; k<CalPositions.nodePosInfo[j].length; k++) {
+					// 夫、婦ノードの位置   行 j  列　k
+					if (CalPositions.nodePosInfo[j][k].gcif_no==husband_gcif_no) {
+						 hus_rectangleX = CalPositions.nodePosInfo[j][k].rectangleX;
+						 hus_rectangleY = CalPositions.nodePosInfo[j][k].rectangleY;
+						 hus_rectanglewidth = CalPositions.nodePosInfo[j][k].rectanglewidth;
+						 hus_rectanglehight = CalPositions.nodePosInfo[j][k].rectanglehight;
+					}else if (CalPositions.nodePosInfo[j][k].gcif_no==wife_gcif_no) {
+						 wif_rectangleX = CalPositions.nodePosInfo[j][k].rectangleX;
+						 wif_rectangleY = CalPositions.nodePosInfo[j][k].rectangleY;
+						 wif_rectanglewidth = CalPositions.nodePosInfo[j][k].rectanglewidth;
+						 wif_rectanglehight = CalPositions.nodePosInfo[j][k].rectanglehight;
+					}
+			    }
+			}
+			//============== hus to wife line==================
+		    lines_Pos.moveToX = hus_rectangleX + hus_rectanglewidth;
+			lines_Pos.moveToY = hus_rectangleY + hus_rectanglehight/2;
+			lines_Pos.lineToX = wif_rectangleX;
+			lines_Pos.lineToY = wif_rectangleY +  wif_rectanglehight/2;
+            console.log("----------- hus to wife line--------");
+			console.log(lines_Pos);
+            PaintClass.lines.push(lines_Pos);
+            PersonRelations.SortedMaritalRelObjects[i].fatherMoveX = lines_Pos.moveToX + (lines_Pos.lineToX - lines_Pos.moveToX )/2;
+             PersonRelations.SortedMaritalRelObjects[i].fatherMoveY = lines_Pos.moveToY;
+            //get the row number of the hus
+            for (var ln =0; ln<CalPositions.layerNodeGcifNoInfo.length; ln++) {
+				for (var col =0; col<CalPositions.layerNodeGcifNoInfo[ln].length; col++) {
+				   if(CalPositions.layerNodeGcifNoInfo[ln][col] == husband_gcif_no){
+						level = ln;
+				   }
+				}
+            }
+            console.log("---------layer:"+level);
+			console.log("--------------find child from parent-----------");
+            //if the parent has son link them with line
+            var firstChild = 0;
+            var mark = false;
+            for (var pr = 0; pr<PersonRelations.ParentChildRelObjects.length; pr++) {
+				// parent 
+			    var row_num_couple = 0;
+				if ( PersonRelations.ParentChildRelObjects[pr].marital_relation_no == relation_no) {
+					for (var lma = 0; lma < CalPositions.layerMaritalNoArray.length; lma++) {
+						for (var r= 0; r < CalPositions.layerMaritalNoArray[lma].length; r++) {
+							if (CalPositions.layerMaritalNoArray[lma][r] == PersonRelations.ParentChildRelObjects[pr].marital_relation_no) {
+                                  row_num_couple = r;
+							}
+						}
+					}
+			        falines_Pos = new Object();
+			        falines_Pos.fatherMoveToX = lines_Pos.moveToX + (lines_Pos.lineToX - lines_Pos.moveToX )/2;
+			        if (i>0 && row_num_couple >0) {
+			        if(falines_Pos.fatherMoveToX <= PersonRelations.SortedMaritalRelObjects[i-1].rightSonX ){
+                          falines_Pos.fatherMoveToX = falines_Pos.fatherMoveToX - 5;
+			        }
+			        }
+				    falines_Pos.fatherMoveToY = lines_Pos.moveToY ;
+				    falines_Pos.fatherLineToX = falines_Pos.fatherMoveToX;
+					// 作成日の高さも含む
+				    falines_Pos.fatherLineToY = (level+1)*CalPositions.row_height + (title_padding_height + title_height);	
+				    if(i>0 && row_num_couple >0){
+				    if(falines_Pos.fatherMoveToX <= PersonRelations.SortedMaritalRelObjects[i-1].rightSonX ){
+                          falines_Pos.fatherLineToY = falines_Pos.fatherLineToY - 5;
+			        }			    
+			        }
+					console.log("----falines_Pos----");
+					console.log(falines_Pos);
+                    PaintClass.falines.push(falines_Pos);
+                    PersonRelations.SortedMaritalRelObjects[i].fatherX = falines_Pos.fatherMoveToX;
+
+			        for (var chln =0; chln<CalPositions.layerNodeGcifNoInfo.length; chln++) {
+						for (var chcol =0; chcol<CalPositions.layerNodeGcifNoInfo[chln].length; chcol++) {
+						   if(CalPositions.layerNodeGcifNoInfo[chln][chcol] == PersonRelations.ParentChildRelObjects[pr].child_gcif_no){
+								childLevel = chln;
+						   }
+						}
+			        }
+					console.log("----childLevel:"+childLevel);
+					console.log("----ParentChildRelObjects[pr].child_gcif_no:"+PersonRelations.ParentChildRelObjects[pr].child_gcif_no);
+			        for (var chj =0; chj<CalPositions.nodePosInfo.length; chj++) {
+						for (var chk =0; chk<CalPositions.nodePosInfo[chj].length; chk++) {
+							if (CalPositions.nodePosInfo[chj][chk].gcif_no==PersonRelations.ParentChildRelObjects[pr].child_gcif_no) {
+								 chil_rectangleX = CalPositions.nodePosInfo[chj][chk].rectangleX;
+								 chil_rectangleY = CalPositions.nodePosInfo[chj][chk].rectangleY;
+								 chil_rectanglewidth = CalPositions.nodePosInfo[chj][chk].rectanglewidth;
+								 chil_rectanglehight = CalPositions.nodePosInfo[chj][chk].rectanglehight;
+								 child_gcif_no = PersonRelations.ParentChildRelObjects[pr].child_gcif_no;
+							}
+						}
+					}
+                    chlines_Pos = new Object();
+			        chlines_Pos.chilMoveToX = chil_rectangleX + chil_rectanglewidth/2 ;
+				    chlines_Pos.chilMoveToY = chil_rectangleY ;
+				    chlines_Pos.chilLineToX = chlines_Pos.chilMoveToX;
+
+				    if (chlines_Pos.chilMoveToX > PersonRelations.SortedMaritalRelObjects[i].rightSonX ) {
+                    PersonRelations.SortedMaritalRelObjects[i].rightSonX = chlines_Pos.chilMoveToX;	
+                    }
+					// Y posはtitleの高さを plus: child to father line(上に描く)
+				    chlines_Pos.chilLineToY = childLevel*CalPositions.row_height  + (title_padding_height + title_height);
+				    if(i>0 && row_num_couple >0){
+				    if(firstChild == 0 &&(chlines_Pos.chilLineToX <=  PersonRelations.SortedMaritalRelObjects[i-1].rightSonX)){
+				    	chlines_Pos.chilLineToY = chlines_Pos.chilLineToY - 5;
+				    }
+				    if(firstChild == 0 &&(chlines_Pos.chilLineToX <=  PersonRelations.SortedMaritalRelObjects[i-1].fatherX)){
+				    	chlines_Pos.chilLineToY = chlines_Pos.chilLineToY + 5;
+				    }
+				    if(firstChild > 0 && mark == true){
+				    	chlines_Pos.chilLineToY = chlines_Pos.chilLineToY + 5;
+				    }
+				    if(falines_Pos.fatherMoveToX <= PersonRelations.SortedMaritalRelObjects[i-1].rightSonX ){
+                          chlines_Pos.chilLineToY = chlines_Pos.chilLineToY - 5;
+			        }	
+			        }
+                    chlines_Pos.child_gcif_no = child_gcif_no;
+                    PaintClass.chlines.push(chlines_Pos);
+
+                    chtofalines_Pos = new Object();
+                    chtofalines_Pos.chiltoFathMoveToX = chlines_Pos.chilLineToX;
+				    chtofalines_Pos.chiltoFathMoveToY = childLevel*CalPositions.row_height + (title_padding_height + title_height);
+				    chtofalines_Pos.chiltoFathLineToX = falines_Pos.fatherLineToX ;				
+				    chtofalines_Pos.chiltoFathLineToY = (level+1)*CalPositions.row_height + (title_padding_height + title_height);
+                    if(i>0 && row_num_couple >0){
+                    if(firstChild == 0 &&(chlines_Pos.chilLineToX <=  PersonRelations.SortedMaritalRelObjects[i-1].rightSonX)){
+				    	chtofalines_Pos.chiltoFathMoveToY = chtofalines_Pos.chiltoFathMoveToY - 5;
+				    	chtofalines_Pos.chiltoFathLineToY = chtofalines_Pos.chiltoFathLineToY - 5;
+				    }
+				    if(firstChild == 0 &&(chlines_Pos.chilLineToX <=  PersonRelations.SortedMaritalRelObjects[i-1].fatherX)){
+				    	mark = true;
+				    	chtofalines_Pos.chiltoFathMoveToY = chtofalines_Pos.chiltoFathMoveToY + 5;
+				    	chtofalines_Pos.chiltoFathLineToY = chtofalines_Pos.chiltoFathLineToY + 5;
+
+				    falines_Pos = new Object();
+			        falines_Pos.fatherMoveToX = chtofalines_Pos.chiltoFathLineToX;
+				    falines_Pos.fatherMoveToY = chtofalines_Pos.chiltoFathLineToY ;
+				    falines_Pos.fatherLineToX = falines_Pos.fatherMoveToX;
+					// 作成日の高さも含む
+				    falines_Pos.fatherLineToY = falines_Pos.fatherMoveToY - 5;	
+					console.log("----falines_Pos----");
+					console.log(falines_Pos);
+                    PaintClass.falines.push(falines_Pos);
+				    }
+				    if (firstChild > 0 && mark == true) {
+	                chtofalines_Pos.chiltoFathMoveToY = chtofalines_Pos.chiltoFathMoveToY + 5;
+				    chtofalines_Pos.chiltoFathLineToY = chtofalines_Pos.chiltoFathLineToY + 5;
+
+				    falines_Pos = new Object();
+			        falines_Pos.fatherMoveToX = chtofalines_Pos.chiltoFathLineToX;
+				    falines_Pos.fatherMoveToY = chtofalines_Pos.chiltoFathLineToY ;
+				    falines_Pos.fatherLineToX = falines_Pos.fatherMoveToX;
+					// 作成日の高さも含む
+				    falines_Pos.fatherLineToY = falines_Pos.fatherMoveToY - 5;	
+					console.log("----falines_Pos----");
+					console.log(falines_Pos);
+                    PaintClass.falines.push(falines_Pos);
+
+				    }
+				    if(falines_Pos.fatherMoveToX <= PersonRelations.SortedMaritalRelObjects[i-1].rightSonX ){
+                        chtofalines_Pos.chiltoFathMoveToY = chtofalines_Pos.chiltoFathMoveToY - 5;
+				    	chtofalines_Pos.chiltoFathLineToY = chtofalines_Pos.chiltoFathLineToY - 5;
+			        }
+			        }
+			        PaintClass.chtofalines.push(chtofalines_Pos);
+                    console.log(PaintClass.chtofalines);
+                   
+                    firstChild = firstChild+1;
+				}
+			}	
+		}
+    },
+	
+	isChild : function(child) {
+		return PersonRelations.ParentChildMap.has(child);
+	},
+	isHusband : function(husband) {
+		return PersonRelations.MaritalHusbandKeyMap.has(husband);
+	},
+	isWife : function(wife) {
+		return PersonRelations.MaritalWifeKeyMap.has(wife);
+	},
+	findWifeNodeFromHusband : function(husband) {
+		return PersonRelations.MaritalHusbandKeyMap.get(husband).wife_gcif_no;
+	},
+	findHusbandNodeFromWife : function(wife) {
+		return PersonRelations.MaritalWifeKeyMap.get(wife).husband_gcif_no;
+	},
+	findRelNodeFromHusband : function(husband) {
+		return PersonRelations.MaritalHusbandKeyMap.get(husband).relation_no;
+	},
+	findRelNodeFromWife : function(wife) {
+		return PersonRelations.MaritalWifeKeyMap.get(wife).relation_no;
+	},
+	findHusbandNodeFromRelNo : function(relation_no) {
+		return PersonRelations.MaritalRelMap.get(relation_no).husband_gcif_no;
+	}
+	
+};
+
+
+
+var PaintClass  = {
+	//[{moveToX: 610, moveToY: 60, lineToX: 710, lineToY: 60, style: '#000000'}, 
+	// {moveToX: 660, moveToY: 60, lineToX: 660, lineToY: 160, style: '#000000' }];
+	lines : [],
+
+    chlines : [],
+
+    falines : [],
+
+    chtofalines : [],
+
+	rectangle: [],
+
+	texts: [],
+	 		
+
+	resetPicPos : function() {
+		canvas_width = 1200;
+		canvas_height = 900
+		PaintClass.rectangle.length = 0;
+		PaintClass.texts.length = 0;
+		PaintClass.lines.length = 0;
+		PaintClass.falines.length = 0;
+		PaintClass.chlines.length = 0;
+		PaintClass.chtofalines.length = 0;
+		
+		
+		//////////clear
+		canvas = document.getElementById("canvas_area");
+		context = canvas.getContext("2d");
+
+		context.clearRect(0,0,canvas_width,canvas_height);
+		
+		
+		//var container=document.getElementById("canvasContainer");  
+		//container.removeChild(canvas);
+		
+		//clearRect無法清除問題 clearRect無法清除問題 clearRect無法清除問題 clearRect無法清除問題 
+		//var canvas_new=document.createElement("canvas_area"); 
+		//canvas_new.width = 1500;
+		//canvas_new.height = 800;
+			//通常我们还会在此时执行下一步绘图操作  
+		//container.appendChild(canvas_new);  
+		//context = canvas_new.getContext("2d"); 
+		//context.clearRect(0,0,canvas_width,canvas_height);
+	
+
+	},
+
+    paintAll : function() {
+
+		console.log("------------------PaintClass.texts");
+		console.log(PaintClass.texts);
+		console.log("------------------PaintClass.lines");
+		console.log(PaintClass.lines);
+		console.log("------------------PaintClass.falines");
+		console.log(PaintClass.falines);
+		console.log("------------------PaintClass.chlines");
+		console.log(PaintClass.chlines);
+		console.log("------------------PaintClass.chtofalines");
+		console.log(PaintClass.chtofalines);
+		console.log("------------------PaintClass.rectangle");
+		console.log(PaintClass.rectangle);
+		
+		//var canvas = document.getElementById("canvas_area");
+		//var context = canvas.getContext("2d");
+		//线
+		//设置对象起始点和终点
+		for (var i = 0; i < PaintClass.lines.length; i++) {
+			 context.moveTo(PaintClass.lines[i].moveToX,PaintClass.lines[i].moveToY);
+			 context.lineTo(PaintClass.lines[i].lineToX,PaintClass.lines[i].lineToY);
+			  //设置样式
+			 context.lineWidth = 2;
+			 context.strokeStyle = PaintClass.lines[i].style;
+			 //绘制
+			 context.stroke();	
+		}
+        
+        for (var j = 0; j < PaintClass.falines.length; j++) {
+             //father line 
+			 context.moveTo(PaintClass.falines[j].fatherMoveToX,PaintClass.falines[j].fatherMoveToY);
+			 context.lineTo(PaintClass.falines[j].fatherLineToX,PaintClass.falines[j].fatherLineToY);
+			  //设置样式
+			 context.lineWidth = 2;
+			 context.strokeStyle = PaintClass.falines[j].style;
+			 //绘制
+			 context.stroke();
+        }
+
+        for (var k = 0; k < PaintClass.chlines.length; k++) {
+        	 //child line 
+			 context.moveTo(PaintClass.chlines[k].chilMoveToX,PaintClass.chlines[k].chilMoveToY);
+			 context.lineTo(PaintClass.chlines[k].chilLineToX,PaintClass.chlines[k].chilLineToY);
+			  //设置样式
+			 context.lineWidth = 2;
+			 context.strokeStyle = PaintClass.chlines[k].style;
+			 //绘制
+			 context.stroke();
+        }
+
+        for (var i = 0; i < PaintClass.chtofalines.length; i++) {
+        		  //child to father line 
+			 context.moveTo(PaintClass.chtofalines[i].chiltoFathMoveToX,PaintClass.chtofalines[i].chiltoFathMoveToY);
+			 context.lineTo(PaintClass.chtofalines[i].chiltoFathLineToX,PaintClass.chtofalines[i].chiltoFathLineToY);
+			  //设置样式
+			 context.lineWidth = 2;
+			 context.strokeStyle = PaintClass.chtofalines[i].style;
+			 //绘制
+			 context.stroke();
+        }
+
+       	// 文字
+		for (var i = 0; i < PaintClass.texts.length; i++) {
+			
+			context .font = PaintClass.texts[i].text_font; 
+            context .textAlign = PaintClass.texts[i].text_textAlign;     
+            context .fillText(PaintClass.texts[i].text_context,PaintClass.texts[i].text_posX,PaintClass.texts[i].text_posY);
+		}
+
+		// 矩形 level 1
+		//使用strokeRect方法
+		for (var i = 0; i < PaintClass.rectangle.length; i++) {
+			
+			if (PaintClass.rectangle[i].fillStyle != null) {
+				context.fillStyle = rgba(0,0,255);/////////////////////////////////////////////////////////////////
+				context.fillRect(PaintClass.rectangle[i].rectangleX,PaintClass.rectangle[i].rectangleY,
+					PaintClass.rectangle[i].rectanglewidth,PaintClass.rectangle[i].rectanglehight);
+			}else{
+				context.strokeStyle = PaintClass.rectangle[i].strokeStyle;
+				context.strokeRect(PaintClass.rectangle[i].rectangleX,PaintClass.rectangle[i].rectangleY,
+				PaintClass.rectangle[i].rectanglewidth,PaintClass.rectangle[i].rectanglehight);
+			}
+		}
+		
+    }
+
+};
+
+/*
+$(document).ready(
+	function() {
+		//d3.select("body").selectAll("div").text("u just clicked, then show");
+		//$('#result2').text("now the page is ready!");
+		$.ajax({
+			url: 'family_relation.json',
+			data: {},
+			async: false,
+			dataType: 'json',
+			success: function (result) {
+				// Ｄ３を利用して、JS ObjectからMapに転換
+				PersonRelations.parseJsonToObjects(result);
+				PersonRelations.toMap();
+
+				CalPositions.initLayer();
+				CalPositions.distributeNodesIntoLayer();
+				CalPositions.calEachNode_XY_Pos();
+				CalPositions.calLines_Couple_Pos();
+	            CalPositions.add_Text_Pos();
+				PaintClass.paintAll();
+				// for test////////////////////////////////////////////////////////////////////////////////////////////////////
+				//$jsonDiv = $('#result');
+				var strHtml = '<ul>'
+								+'<li><a href="#">person</a>'
+								+'<ul>';
+				$.each(result.person,function(infoIndex,info){ 
+					strHtml += '<li>'+info["gcif_no"]+" "; 
+					strHtml += info["name"]+" "; 
+					strHtml += info["sex"]+" ";
+					strHtml += info["birthdate"]+" ";
+					strHtml += info["assets"]+" ";
+					strHtml += info["main_flg"]+" ";
+					strHtml += '</li>'; 
+				}); 
+				strHtml += '</ul></li></ul>';
+
+				strHtml += '<ul>'
+				strHtml += '<li><a href="#">marital_relation</a>'
+				strHtml += '<ul>';				
+				$.each(result.marital_relation,function(infoIndex,info){
+					strHtml += '<li>'+info["relation_no"]+" ";
+					strHtml += info["husband_gcif_no"]+" "; 
+					strHtml += info["wife_gcif_no"]+" ";
+					strHtml += '</li>';
+				});
+				strHtml += '</ul></li></ul>';
+
+
+				strHtml += '<ul>'
+				strHtml += '<li><a href="#">parent-child_relation</a>'
+				strHtml += '<ul>';					
+				$.each(result.parent_child_relation,function(infoIndex,info){
+					strHtml += '<li>'+info["relation_no"]+" ";
+					strHtml += info["marital_relation_no"]+" ";
+					strHtml += info["child_gcif_no"]+" ";
+					strHtml += '</li>';
+				});
+				strHtml +=  '</ul></li></ul>';
+				//$jsonDiv.html(strHtml); 
+	
+			}
+		}); 
+	});
+*/
+
+$(function onload() {
+		
+	/*	var json_text="			///{\"person\":[{\"gcif_no\":\"100000011\",\"name\":\"山田たえ\",\"relation\":\"父\",\"sub_relation\":\"父\",\"sex\":\"m\",\"birthdate\":\"19250513\",\"birthdate_text\":\"M25.5.13生\",\"age\":\"\",\"death_status\":\"\",\"job\":\"不動産業\",\"assets\":\"\",\"main_flg\":\"false\"}],\"marital_relation\":[{\"relation_no\":\"r000000013\",\"husband_gcif_no\":\"100000036\",\"wife_gcif_no\":\"100000037\"},{\"relation_no\":\"r000000012\",\"husband_gcif_no\":\"100000034\",\"wife_gcif_no\":\"100000035\"}],\"parent_child_relation\":[{\"relation_no\":\"s000000002\",\"marital_relation_no\":\"r000000001\",\"child_gcif_no\":\"100000010\"},{\"relation_no\":\"s000000004\",\"marital_relation_no\":\"r000000002\",\"child_gcif_no\":\"100000012\"}]}";
+		console.log("======================================json_text===========================================================");
+		console.log(json_text);
+
+var jjjj=eval(json_text);
+json_text = json_text.replace(/[ ]/g, "").replace(/[　]/g, "").replace(/\n/g,"").replace(/\r/g,"").replace(/\t/g,"").replace(/\//g,"");
+		
+		json_text =json_text.replace(/\\/g,'aa');
+		json_text =json_text.replace(/\\/,'bb');
+	
+		json_text = json_text.replace(/[\\]/g,'cc');
+		json_text =json_text.replace("\\","");
+		
+		var jsonBook=JSON.stringify(json_text); 
+		
+		
+		//var obj = $.parseJSON(json_text);
+		var obj=eval("("+json_text+")");
+		
+		alert("json_text.indexOf()"+json_text.indexOf("\\"));
+		for ( i=0; i<json_text.length; i++) {
+			if (json_text.indexOf("\\") >0){
+				alert("fuck");
+				
+			}
+			
+		}
+		
+
+		
+console.log(json_text);
+		
+		
+		var data={ 
+
+    "total": 1, 
+
+    "page": 1, 
+
+    "records": 8, 
+
+    "costtime": "196.0112", 
+
+    "rows": [{ 
+
+        "Row": 1, 
+
+        "id": 38, 
+
+        "title": "adsf", 
+
+        "keyword": "asdf", 
+
+        "description": "", 
+
+        "realTitle": "", 
+
+        "imgSrc": "/goodimage/20170329163544563_01-1.jpg", 
+
+        "fileSrc": "", 
+
+        "createTime": "2017-03-29T16:03:10", 
+
+        "updateTime": "2017-03-29T16:35:46", 
+
+        "editor": "管理员", 
+
+        "source": "本站", 
+
+        "sort": 1, 
+
+        "hits": 0, 
+
+        "content": "sadf", 
+
+        "typeId": 19, 
+
+        "fine": false, 
+
+        "view": true, 
+
+        "role": 1, 
+
+        "url": "/admin/Net/Https/02_article.ashx", 
+
+        "a1": "", 
+
+        "a2": "", 
+
+        "a3": "", 
+
+        "a4": "", 
+
+        "a5": "", 
+
+        "a6": "", 
+
+        "a8": "", 
+
+        "a7": "", 
+
+        "a10": "", 
+
+        "a9": "", 
+
+        "typeIds": "我的产品", 
+
+        "expanded": "true", 
+
+        "isLeaf": "false", 
+
+        "rgt": "9999999", 
+
+        "lft": "1" 
+
+    }] 
+
+}; 
+
+$.each(data.rows,function(index,row){ 
+
+    console.log("第"+row.Row+"行"); 
+
+    $.each(row,function(k,v){ 
+
+       console.log(k + "=" + v); 
+
+    }); 
+
+});
+	
+		*/
+	$('#json_button').on('click', function() {
+		
+		console.log("■■■■■■■■■■■■■■■■■■■■JSONデータ■■■■■■■■■■■■■■■■■■");
+		jsondata = $('#json_input_area').val();
+		json_text = jsondata.replace(/[ ]/g, "").replace(/[　]/g, "").replace(/\n/g,"").replace(/\r/g,"").replace(/\t/g,"").replace(/\//g,"");
+
+		console.log(json_text);
+		if ( json_text != "") {
+			var json_obj=eval("("+json_text+")");
+			//json_text =json_text.replace('\\','');  できない
+			parseJsonData(json_obj);
+
+		} else {
+			alert("JSONデータを入力してください");
+			
+		}
+	});
+});
+
+parseJsonData = function(json_data_input) {
+		resetAllStructs();
+		PersonRelations.parseJsonToObjects(json_data_input);
+		PersonRelations.toMap();
+
+		CalPositions.initLayer();
+		CalPositions.distributeNodesIntoLayer();
+		
+		PaintClass.resetPicPos();
+		
+		
+		CalPositions.calEachNode_XY_Pos();
+		CalPositions.calLines_Couple_Pos();
+		CalPositions.add_Text_Pos();
+		PaintClass.paintAll();
+
+}
+</script>
+
+
+</head>
+<body>
+	<div id="json_input" style="background:white;border:1px;width:900px;height:200px;padding: 3px;" >
+        <textarea id ="json_input_area" rows="12" cols="100" maxlength="1000000" autofocus>
+    	</textarea>	
+        <div  style="padding: 3px;">
+			<input type="button" id ="json_button" value="描画" onclick="" />
+    	</div>
+        <div id ="canvasContainer">
+            <!--background-color: rgb(238, 238, 238)-->
+            <canvas width="1200" height="900" id="canvas_area" style="border: 1px solid rgb(68, 68, 68); cursor: default;"></canvas>
+        </div>
+		<input type="button" value="このページを印刷" onclick="window.print();" />
+		<!--<input type="button" value="ScriptXでプレビュー" onclick="SetPrintSettings();Preview();"  />-->
+		<input type="button" value="ScriptXで印刷" onclick="SetPrintSettings();Print();"  />
+    </div>
+    <div style="margin: 10px;"></div>
+</body>
+</html>
